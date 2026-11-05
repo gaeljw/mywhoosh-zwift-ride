@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_description">Taps MyWhoosh\'s gear buttons when you press the Zwift Ride shift buttons, and shows the calibration overlay. It reads nothing from the screen.</string>
+</resources>
