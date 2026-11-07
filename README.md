@@ -49,31 +49,13 @@ Only gear up and gear down are handled. You choose which physical buttons they a
 A Zwift Ride on firmware **1.3.0+** hides its Zwift service until Zwift unlocks it (about a day per unlock). The app
 shows the firmware version and a clear message in that case. Unlocking is not implemented.
 
-## Build on Fedora (first time)
+## Install
 
-No Android Studio needed; the command-line SDK is enough.
+1. Download `ridebridge-<version>.apk` from the [latest release](../../releases/latest) and open it on the phone.
+   Android will ask you to allow installing apps from this source.
+2. Or build it yourself and install it with `adb`: see [CONTRIBUTING.md](CONTRIBUTING.md).
 
-```bash
-# JDK 17 to 21 (newer JDKs such as 25 are not supported by this Gradle/AGP version)
-export JAVA_HOME=/usr/lib/jvm/temurin-21-jdk
-
-# Android command-line tools: download "Command line tools only" for Linux from
-# https://developer.android.com/studio and unzip into ~/Android/Sdk/cmdline-tools/latest
-export ANDROID_HOME=~/Android/Sdk
-$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-36" "build-tools;36.0.0"
-
-echo "sdk.dir=$ANDROID_HOME" > local.properties    # machine-specific, git-ignored
-./gradlew assembleDebug                              # the Gradle wrapper is included
-```
-
-`adb` is installed by `platform-tools` (`$ANDROID_HOME/platform-tools/adb`); no `dnf install` is required.
-
-Install on the phone (USB debugging on):
-
-```bash
-$ANDROID_HOME/platform-tools/adb install -r app/build/outputs/apk/debug/app-debug.apk
-```
+Updates install over the previous version as long as they come from the same release signing key.
 
 ## First run on the phone
 
