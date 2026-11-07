@@ -47,4 +47,8 @@ kotlin {
     compilerOptions { jvmTarget.set(JvmTarget.JVM_17) }
 }
 
-// No dependencies on purpose: plain Android framework + Kotlin stdlib.
+// No runtime dependencies on purpose: plain Android framework + Kotlin stdlib. JUnit is for local unit tests only.
+dependencies {
+    testImplementation("junit:junit:4.13.2")
+}
+

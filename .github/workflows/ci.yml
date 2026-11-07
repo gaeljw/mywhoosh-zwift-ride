@@ -26,5 +26,8 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v6
 
+      - name: Unit tests
+        run: ./gradlew testDebugUnitTest --stacktrace
+
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
