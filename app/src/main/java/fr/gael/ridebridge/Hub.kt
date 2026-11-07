@@ -2,6 +2,7 @@ package fr.gael.ridebridge
 
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 
 enum class Direction { UP, DOWN }
 
@@ -16,9 +17,19 @@ object Hub {
     var firmware: String? = null; private set
     var lastEvent = ""; private set
 
-    /** When set, the next controller button press is assigned to this direction instead of shifting. */
-    var learning: Direction? = null
-        set(value) { field = value; notifyListeners() }
+    private const val LEARN_TIMEOUT_MS = 10_000L
+    private val learnWindow = LearnWindow(LEARN_TIMEOUT_MS) { SystemClock.elapsedRealtime() }
+    private val learnExpired = Runnable { notifyListeners() }
+
+    /** When set, the next controller button press is assigned to this direction instead of shifting. Expires on its own. */
+    var learning: Direction?
+        get() = learnWindow.current()
+        set(value) {
+            learnWindow.set(value)
+            main.removeCallbacks(learnExpired)
+            if (value != null) main.postDelayed(learnExpired, LEARN_TIMEOUT_MS)
+            notifyListeners()
+        }
 
     fun update(
         status: String? = null,
