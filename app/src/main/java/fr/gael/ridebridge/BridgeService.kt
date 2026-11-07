@@ -88,6 +88,7 @@ class BridgeService : Service(), ZwiftRideClient.Listener {
         val name = "Gear ${dir.name.lowercase()}"
         val point = prefs.point(dir) ?: return Hub.update(lastEvent = "$name: tap point not calibrated yet")
         val tapper = TapService.instance ?: return Hub.update(lastEvent = "$name: accessibility service is off")
+        tapper.blockedReason()?.let { return Hub.update(lastEvent = "$name: $it") }
         val ok = tapper.tap(point)
         Hub.update(lastEvent = if (ok) name else "$name: tap rejected by Android")
         when (prefs.feedback) {
