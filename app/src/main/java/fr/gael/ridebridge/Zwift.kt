@@ -72,6 +72,8 @@ object RideKeyPad {
                 1 -> i += 8
                 2 -> {
                     val len = readVarint(frame, i) ?: return null
+                    // Untrusted input: a negative or oversized length would move i backwards (endless loop) or past the end.
+                    if (len.first < 0 || len.first > frame.size - len.second) return null
                     i = len.second + len.first.toInt()
                 }
                 5 -> i += 4
