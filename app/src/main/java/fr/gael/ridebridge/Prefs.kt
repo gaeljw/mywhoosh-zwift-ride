@@ -25,6 +25,11 @@ class Prefs(context: Context) {
     fun setPoint(dir: Direction, p: TapPoint) = sp.edit()
         .putFloat("x_$dir", p.x).putFloat("y_$dir", p.y).putInt("rot_$dir", p.rotation).apply()
 
+    /** Address of the controller to talk to; set on the first successful connection. */
+    var controller: String?
+        get() = sp.getString("controller", null)
+        set(v) = sp.edit().apply { if (v == null) remove("controller") else putString("controller", v) }.apply()
+
     var feedback: Feedback
         get() = runCatching { Feedback.valueOf(sp.getString("feedback", null)!!) }.getOrDefault(Feedback.CONTROLLER)
         set(v) = sp.edit().putString("feedback", v.name).apply()

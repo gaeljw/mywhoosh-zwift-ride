@@ -24,11 +24,16 @@ import android.os.Looper
  * Permissions are checked by the activity before the service starts.
  */
 @SuppressLint("MissingPermission")
-class ZwiftRideClient(context: Context, private val listener: Listener) {
+class ZwiftRideClient(
+    context: Context,
+    private val listener: Listener,
+    /** Address of the only controller to connect to, or null to take the first one found. */
+    private val pinnedAddress: () -> String?,
+) {
 
     interface Listener {
         fun onStatus(text: String)
-        fun onConnected(firmware: String?)
+        fun onConnected(firmware: String?, address: String)
         fun onDisconnected()
         /** Bit mask (see [RideButton]) of buttons that went from released to pressed. */
         fun onButtonsPressed(newlyPressed: Int)
@@ -86,11 +91,15 @@ class ZwiftRideClient(context: Context, private val listener: Listener) {
         // A filtered scan keeps working with the screen off.
         val filter = ScanFilter.Builder()
             .setManufacturerData(Zwift.MANUFACTURER_ID, byteArrayOf(Zwift.RIDE_LEFT.toByte()), byteArrayOf(0xFF.toByte()))
+            .apply { pinnedAddress()?.let { setDeviceAddress(it.uppercase()) } }
             .build()
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
         scanner.startScan(listOf(filter), settings, scanCallback)
         scanning = true
-        listener.onStatus("Searching for the Zwift Ride (left hood)… press a button to wake it")
+        listener.onStatus(
+            if (pinnedAddress() == null) "Searching for the Zwift Ride (left hood)… press a button to wake it"
+            else "Searching for your Zwift Ride (left hood)… press a button to wake it"
+        )
     }
 
     private fun stopScan() {
@@ -107,6 +116,7 @@ class ZwiftRideClient(context: Context, private val listener: Listener) {
         override fun onScanResult(callbackType: Int, result: ScanResult) {
             main.post {
                 if (!scanning) return@post
+                if (!ControllerPin.accepts(pinnedAddress(), result.device.address)) return@post
                 stopScan()
                 connect(result.device)
             }
@@ -210,7 +220,7 @@ class ZwiftRideClient(context: Context, private val listener: Listener) {
             steps.add {
                 it.writeCharacteristic(rxCh, Zwift.RIDE_ON, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
                 ready = true
-                listener.onConnected(firmware)
+                listener.onConnected(firmware, g.device.address)
                 listener.onStatus("Ready")
                 false
             }

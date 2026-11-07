@@ -32,7 +32,7 @@ class BridgeService : Service(), ZwiftRideClient.Listener {
     override fun onCreate() {
         super.onCreate()
         prefs = Prefs(this)
-        client = ZwiftRideClient(this, this)
+        client = ZwiftRideClient(this, this) { prefs.controller }
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL, "Controller bridge", NotificationManager.IMPORTANCE_LOW)
         )
@@ -65,7 +65,13 @@ class BridgeService : Service(), ZwiftRideClient.Listener {
         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text))
     }
 
-    override fun onConnected(firmware: String?) = Hub.update(connected = true, firmware = firmware ?: "unknown")
+    override fun onConnected(firmware: String?, address: String) {
+        Hub.update(connected = true, firmware = firmware ?: "unknown")
+        ControllerPin.toPin(prefs.controller, address)?.let {
+            prefs.controller = it
+            Hub.update(lastEvent = "Controller $it remembered")
+        }
+    }
 
     override fun onDisconnected() = Hub.update(connected = false)
 
