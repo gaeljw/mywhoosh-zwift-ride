@@ -18,6 +18,7 @@ class TapService : AccessibilityService() {
     }
 
     private val main = Handler(Looper.getMainLooper())
+    private val gate = TapGate()
     private var overlay: CalibrationOverlay? = null
 
     override fun onServiceConnected() {
@@ -27,13 +28,20 @@ class TapService : AccessibilityService() {
 
     override fun onUnbind(intent: Intent?): Boolean {
         instance = null
+        gate.reset()
         overlay?.dismiss()
         Hub.update()
         return super.onUnbind(intent)
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) gate.onWindowChanged(event.packageName)
+    }
+
     override fun onInterrupt() = Unit
+
+    /** Why a tap would be refused right now (not in MyWhoosh, overlay open), or null if it is fine. */
+    fun blockedReason(): String? = gate.blockedReason()
 
     fun tap(p: TapPoint): Boolean {
         val (x, y) = Screen.adjust(this, p)
@@ -48,7 +56,10 @@ class TapService : AccessibilityService() {
     fun startCalibration(delayMs: Long) {
         main.postDelayed({
             if (overlay == null) {
-                overlay = CalibrationOverlay(this) { overlay = null }.also { it.show() }
+                overlay = CalibrationOverlay(this) { overlay = null; gate.overlayOpen = false }.also {
+                    it.show()
+                    gate.overlayOpen = true
+                }
             }
         }, delayMs)
     }
