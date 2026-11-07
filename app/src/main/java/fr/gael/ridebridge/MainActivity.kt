@@ -29,6 +29,7 @@ class MainActivity : Activity() {
     private lateinit var startButton: Button
     private lateinit var learnUp: Button
     private lateinit var learnDown: Button
+    private lateinit var controllerView: TextView
     private lateinit var pointsView: TextView
     private lateinit var checklistView: TextView
     private val listener: () -> Unit = { render() }
@@ -60,6 +61,10 @@ class MainActivity : Activity() {
         section("Shift buttons")
         learnUp = button("") { learn(Direction.UP) }
         learnDown = button("") { learn(Direction.DOWN) }
+
+        section("Controller")
+        controllerView = text()
+        button("Forget controller") { forgetController() }
 
         section("Tap points on MyWhoosh")
         pointsView = text()
@@ -141,6 +146,12 @@ class MainActivity : Activity() {
         Hub.learning = if (Hub.learning == dir) null else dir
     }
 
+    private fun forgetController() {
+        prefs.controller = null
+        render()
+        toast(if (BridgeService.isRunning) "Stop and start the bridge to pair with another controller" else "Controller forgotten")
+    }
+
     private fun calibrate() {
         val service = TapService.instance ?: return toast("Turn on the accessibility service first (setup step 1)")
         service.startCalibration(5_000)
@@ -175,6 +186,9 @@ class MainActivity : Activity() {
             else "Gear ${dir.name.lowercase()}: ${RideButton.labels(prefs.mask(dir))} (tap to change)"
         learnUp.text = learnLabel(Direction.UP)
         learnDown.text = learnLabel(Direction.DOWN)
+
+        controllerView.text = prefs.controller?.let { "Only connects to $it" }
+            ?: "Not paired yet: the first Zwift Ride found will be remembered"
 
         pointsView.text = Direction.entries.joinToString("\n") { dir ->
             val p = prefs.point(dir)
