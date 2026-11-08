@@ -13,7 +13,7 @@ android {
         applicationId = "fr.gael.ridebridge"
         minSdk = 33          // Android 13+: lets us use the modern, non-deprecated BLE APIs
         targetSdk = 36       // Android 16
-        // Overridden by the release workflow: -PversionName=<tag without "v"> -PversionCode=<run number>
+        // Overridden by the workflows with -PversionName / -PversionCode from .github/scripts/version.sh
         versionCode = (findProperty("versionCode") as String?)?.toInt() ?: 1
         versionName = (findProperty("versionName") as String?) ?: "0.1"
     }
