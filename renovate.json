@@ -2,12 +2,5 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:recommended"
-  ],
-  "packageRules": [
-    {
-      "description": "AGP 8.x uses Gradle internal APIs removed in Gradle 9.6",
-      "matchDepNames": ["gradle"],
-      "allowedVersions": "<9.6.0"
-    }
   ]
 }
