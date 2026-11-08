@@ -58,7 +58,7 @@ jobs:
           "$ANDROID_HOME"/build-tools/36.0.0/apksigner verify --print-certs "$APK"
           cp "$APK" "ridebridge-$versionName.apk"
 
-      - uses: actions/upload-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
           name: ridebridge-${{ env.versionName }}
           path: ridebridge-${{ env.versionName }}.apk
