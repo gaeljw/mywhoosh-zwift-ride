@@ -19,7 +19,7 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * Finds the Zwift Ride's left hood, connects, runs the "RideOn" handshake and reports button presses.
+ * Finds a Zwift Ride hood (left or right), connects, runs the "RideOn" handshake and reports button presses.
  * Reconnects on its own. All listener calls happen on the main thread.
  * Permissions are checked by the activity before the service starts.
  */
@@ -89,16 +89,18 @@ class ZwiftRideClient(
             return
         }
         // A filtered scan keeps working with the screen off.
-        val filter = ScanFilter.Builder()
-            .setManufacturerData(Zwift.MANUFACTURER_ID, byteArrayOf(Zwift.RIDE_LEFT.toByte()), byteArrayOf(0xFF.toByte()))
-            .apply { pinnedAddress()?.let { setDeviceAddress(it.uppercase()) } }
-            .build()
+        val filters = listOf(Zwift.RIDE_LEFT, Zwift.RIDE_RIGHT).map { side ->
+            ScanFilter.Builder()
+                .setManufacturerData(Zwift.MANUFACTURER_ID, byteArrayOf(side.toByte()), byteArrayOf(0xFF.toByte()))
+                .apply { pinnedAddress()?.let { setDeviceAddress(it.uppercase()) } }
+                .build()
+        }
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
-        scanner.startScan(listOf(filter), settings, scanCallback)
+        scanner.startScan(filters, settings, scanCallback)
         scanning = true
         listener.onStatus(
-            if (pinnedAddress() == null) "Searching for the Zwift Ride (left hood)… press a button to wake it"
-            else "Searching for your Zwift Ride (left hood)… press a button to wake it"
+            if (pinnedAddress() == null) "Searching for the Zwift Ride… press a button to wake it"
+            else "Searching for your Zwift Ride… press a button to wake it"
         )
     }
 

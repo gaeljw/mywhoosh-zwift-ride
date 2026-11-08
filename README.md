@@ -27,8 +27,9 @@ RideBridge listens to the Ride's shift buttons over Bluetooth and taps MyWhoosh'
 
 ## How it works
 
-- Connects to the Ride's **left hood** (manufacturer data `0x094A` / first byte `0x08`), which reports the buttons of
-  both hoods.
+- Connects to a Ride hood, **left** (manufacturer data `0x094A` / first byte `0x08`) or **right** (first byte `0x07`),
+  whichever is found first (or the one you pinned). On a Ride v1 (firmware below 1.3) the left hood reports the buttons
+  of both hoods; the Ride v2 may need each hood connected separately, which is not supported yet.
 - Handshake and button decoding follow [BikeControl](https://github.com/jonasbark/swiftcontrol). Its current code is
   under a non-commercial licence, so this is an independent Kotlin re-implementation of the protocol for personal use.
 - Taps are sent by an Android **AccessibilityService** (`dispatchGesture`). The calibration overlay is an

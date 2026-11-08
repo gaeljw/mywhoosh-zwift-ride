@@ -6,12 +6,13 @@ import java.util.UUID
  * Zwift Ride BLE protocol, as reverse-engineered by BikeControl
  * (github.com/jonasbark/swiftcontrol, lib/bluetooth/devices/zwift/).
  *
- * The Ride advertises two halves; only the LEFT hood (manufacturer byte 0x08) is connected to,
- * and it reports the buttons of both hoods.
+ * The Ride advertises two halves: left (manufacturer byte 0x08) and right (0x07). Either one is
+ * connected to. On a Ride v1 (firmware < 1.3) the left hood reports the buttons of both hoods.
  */
 object Zwift {
     const val MANUFACTURER_ID = 0x094A
     const val RIDE_LEFT = 0x08
+    const val RIDE_RIGHT = 0x07
 
     val SERVICE_RIDE: UUID = UUID.fromString("0000fc82-0000-1000-8000-00805f9b34fb")
     val SERVICE_LEGACY: UUID = UUID.fromString("00000001-19ca-4651-86e5-fa29dcdd09d1")
