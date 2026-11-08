@@ -26,7 +26,7 @@ same phone. Only gear up / gear down matter.
 - Xiaomi setup checklist in the app: accessibility, restricted settings, autostart, battery.
 
 ## Protocol (from BikeControl, github.com/jonasbark/swiftcontrol, lib/bluetooth/devices/zwift/)
-- Connect only to the LEFT hood: manufacturer id 0x094A, first payload byte 0x08. It reports both hoods.
+- Connect to the left (first payload byte 0x08) or right (0x07) hood, manufacturer id 0x094A. Ride v1 left hood reports both hoods; Ride v2 likely needs one connection per hood (not implemented).
 - Service fc82 (or legacy 00000001-19CA-…). Notify on …0002, indicate on …0004, write "RideOn" to …0003.
 - Button frames: opcode 0x23 + RideKeyPadStatus protobuf; field 1 ButtonMap, active-low bits (0 = pressed).
 - Vibrate: write 12 12 08 0A 06 08 02 10 00 18 20 to …0003 without response.
