@@ -1,0 +1,65 @@
+name: Build APK
+
+# On-demand signed APK of the current main, for testing between releases. Same signing key as releases, so it installs
+# over (and is replaced by) any release. Version: latest v* tag + commits since (see .github/scripts/version.sh).
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+          fetch-depth: 0   # full history and tags, needed by version.sh
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v4
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
+
+      - uses: gradle/actions/setup-gradle@v6
+
+      - name: Decode release keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::Secret KEYSTORE_BASE64 is not set, refusing to build an unsigned APK (see CONTRIBUTING)."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.jks"
+          echo "RIDEBRIDGE_KEYSTORE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+
+      - name: Compute version
+        run: .github/scripts/version.sh >> "$GITHUB_ENV"
+
+      - name: Build signed release APK
+        env:
+          RIDEBRIDGE_KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          RIDEBRIDGE_KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          RIDEBRIDGE_KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: >
+          ./gradlew assembleRelease --stacktrace
+          -PversionName="$versionName"
+          -PversionCode="$versionCode"
+
+      - name: Verify signature
+        run: |
+          APK=app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME"/build-tools/36.0.0/apksigner verify --print-certs "$APK"
+          cp "$APK" "ridebridge-$versionName.apk"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ridebridge-${{ env.versionName }}
+          path: ridebridge-${{ env.versionName }}.apk
+          retention-days: 14

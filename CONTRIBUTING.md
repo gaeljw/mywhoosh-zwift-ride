@@ -47,7 +47,28 @@ $ANDROID_HOME/platform-tools/adb install -r app/build/outputs/apk/debug/app-debu
   too), the APK is attached to it and its title and notes are left untouched. Otherwise the release is created with
   generated notes. A *draft* release has no tag yet, so nothing runs until you publish it.
 
-  The app's version name is the tag without the `v`, and the version code is the workflow run number.
+  The app's version name is the tag without the `v`, and the version code is derived from it (see below).
+- **Build APK** (`.github/workflows/build-apk.yml`): started by hand (*Actions* tab, or `gh workflow run build-apk.yml`),
+  builds a **signed** APK of the current `main` and uploads it as a workflow artifact kept for 14 days:
+
+  ```bash
+  gh workflow run build-apk.yml
+  gh run watch && gh run download --name 'ridebridge-*'   # then: adb install -r ridebridge-*.apk
+  ```
+
+  It uses the same key as releases, so it installs over any release and the next release installs over it.
+
+### Versions
+
+`.github/scripts/version.sh` computes both values from the latest `v*` tag reachable from the build and `n`, the number
+of commits since that tag:
+
+- version name: `0.2` on the tag itself, `0.2+5.abc1234` for 5 commits after `v0.2`;
+- version code: `(major*10000 + minor*100 + patch) * 1000 + n`, e.g. `200000` for `v0.2`, `200005` for `v0.2` + 5 commits,
+  `201000` for `v0.2.1`.
+
+So builds between two releases always sort above the first and below the second. Tags must look like `vMAJOR[.MINOR[.PATCH]]`
+with minor and patch at most 99, and fewer than 1000 commits between two tags, otherwise the script fails.
 
 ### One-time setup: signing key
 
