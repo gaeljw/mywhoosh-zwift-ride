@@ -25,10 +25,14 @@ class Prefs(context: Context) {
     fun setPoint(dir: Direction, p: TapPoint) = sp.edit()
         .putFloat("x_$dir", p.x).putFloat("y_$dir", p.y).putInt("rot_$dir", p.rotation).apply()
 
-    /** Address of the controller to talk to; set on the first successful connection. */
-    var controller: String?
-        get() = sp.getString("controller", null)
-        set(v) = sp.edit().apply { if (v == null) remove("controller") else putString("controller", v) }.apply()
+    /** Address of the hood to talk to; set on the first successful connection. */
+    fun controller(hood: Hood): String? =
+        sp.getString("controller_$hood", null) ?: if (hood == Hood.LEFT) sp.getString("controller", null) else null
+
+    fun setController(hood: Hood, address: String?) = sp.edit().apply {
+        if (hood == Hood.LEFT) remove("controller") // single-hood versions stored the left hood here
+        if (address == null) remove("controller_$hood") else putString("controller_$hood", address)
+    }.apply()
 
     var feedback: Feedback
         get() = runCatching { Feedback.valueOf(sp.getString("feedback", null)!!) }.getOrDefault(Feedback.CONTROLLER)

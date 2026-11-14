@@ -19,24 +19,25 @@ import android.os.Handler
 import android.os.Looper
 
 /**
- * Finds the Zwift Ride's left hood, connects, runs the "RideOn" handshake and reports button presses.
+ * Finds one hood of the Zwift Ride, connects, runs the "RideOn" handshake and reports button presses.
  * Reconnects on its own. All listener calls happen on the main thread.
  * Permissions are checked by the activity before the service starts.
  */
 @SuppressLint("MissingPermission")
 class ZwiftRideClient(
     context: Context,
+    private val hood: Hood,
     private val listener: Listener,
     /** Address of the only controller to connect to, or null to take the first one found. */
     private val pinnedAddress: () -> String?,
 ) {
 
     interface Listener {
-        fun onStatus(text: String)
-        fun onConnected(firmware: String?, address: String)
-        fun onDisconnected()
-        /** Bit mask (see [RideButton]) of buttons that went from released to pressed. */
-        fun onButtonsPressed(newlyPressed: Int)
+        fun onStatus(hood: Hood, text: String)
+        fun onConnected(hood: Hood, firmware: String?, address: String)
+        fun onDisconnected(hood: Hood)
+        /** Bit mask (see [RideButton]) of the buttons this hood reports as held; sent on every frame. */
+        fun onButtonsHeld(hood: Hood, held: Int)
     }
 
     private val ctx = context.applicationContext
@@ -49,7 +50,6 @@ class ZwiftRideClient(
     private var syncRx: BluetoothGattCharacteristic? = null
     private var ready = false
     private var firmware: String? = null
-    private var pressed = 0
     private var reconnectDelayMs = 2_000L
 
     /** Android runs one GATT operation at a time: each step starts one and returns true to wait for its callback. */
@@ -84,21 +84,22 @@ class ZwiftRideClient(
         if (!running || scanning || gatt != null) return
         val scanner = adapter?.takeIf { it.isEnabled }?.bluetoothLeScanner
         if (scanner == null) {
-            listener.onStatus("Bluetooth is off")
+            listener.onStatus(hood, "Bluetooth is off")
             retry(5_000)
             return
         }
         // A filtered scan keeps working with the screen off.
         val filter = ScanFilter.Builder()
-            .setManufacturerData(Zwift.MANUFACTURER_ID, byteArrayOf(Zwift.RIDE_LEFT.toByte()), byteArrayOf(0xFF.toByte()))
+            .setManufacturerData(Zwift.MANUFACTURER_ID, byteArrayOf(hood.id.toByte()), byteArrayOf(0xFF.toByte()))
             .apply { pinnedAddress()?.let { setDeviceAddress(it.uppercase()) } }
             .build()
         val settings = ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
         scanner.startScan(listOf(filter), settings, scanCallback)
         scanning = true
         listener.onStatus(
-            if (pinnedAddress() == null) "Searching for the Zwift Ride (left hood)… press a button to wake it"
-            else "Searching for your Zwift Ride (left hood)… press a button to wake it"
+            hood,
+            if (pinnedAddress() == null) "Searching for the Zwift Ride (${hood.label})… press a button to wake it"
+            else "Searching for your Zwift Ride (${hood.label})… press a button to wake it"
         )
     }
 
@@ -125,14 +126,14 @@ class ZwiftRideClient(
         override fun onScanFailed(errorCode: Int) {
             main.post {
                 scanning = false
-                listener.onStatus("Scan failed (code $errorCode), retrying")
+                listener.onStatus(hood, "Scan failed (code $errorCode), retrying")
                 retry(5_000)
             }
         }
     }
 
     private fun connect(device: BluetoothDevice) {
-        listener.onStatus("Connecting to ${device.name ?: device.address}…")
+        listener.onStatus(hood, "Connecting to ${device.name ?: device.address}…")
         gatt = device.connectGatt(ctx, false, gattCallback, BluetoothDevice.TRANSPORT_LE)
     }
 
@@ -144,7 +145,7 @@ class ZwiftRideClient(
                 if (gatt !== g) return@post
                 when (newState) {
                     BluetoothProfile.STATE_CONNECTED -> {
-                        listener.onStatus("Connected, discovering services…")
+                        listener.onStatus(hood, "Connected, discovering services…")
                         g.discoverServices()
                     }
                     BluetoothProfile.STATE_DISCONNECTED -> {
@@ -153,11 +154,10 @@ class ZwiftRideClient(
                         syncRx = null
                         ready = false
                         steps.clear()
-                        pressed = 0
-                        listener.onDisconnected()
+                        listener.onDisconnected(hood)
                         // Keep the "service not found" explanation visible during the long retry.
                         if (running && reconnectDelayMs <= 2_000) {
-                            listener.onStatus("Disconnected (status $status), searching again…")
+                            listener.onStatus(hood, "Disconnected (status $status), searching again…")
                         }
                         retry(reconnectDelayMs)
                     }
@@ -204,6 +204,7 @@ class ZwiftRideClient(
         if (asyncCh == null || txCh == null || rxCh == null) {
             steps.add {
                 listener.onStatus(
+                    hood,
                     "Zwift service not found (firmware ${firmware ?: "unknown"}). A Zwift Ride on firmware 1.3+ " +
                         "hides it until Zwift unlocks it; very old firmware needs an update in Zwift Companion. " +
                         "Retrying in 30 s."
@@ -220,8 +221,8 @@ class ZwiftRideClient(
             steps.add {
                 it.writeCharacteristic(rxCh, Zwift.RIDE_ON, BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE)
                 ready = true
-                listener.onConnected(firmware, g.device.address)
-                listener.onStatus("Ready")
+                listener.onConnected(hood, firmware, g.device.address)
+                listener.onStatus(hood, "Ready")
                 false
             }
         }
@@ -248,8 +249,6 @@ class ZwiftRideClient(
         if (value.isEmpty() || (value[0].toInt() and 0xFF) != Zwift.OP_CONTROLLER_NOTIFICATION) return
         val buttonMap = RideKeyPad.buttonMap(value, 1) ?: return
         val nowPressed = buttonMap.inv() and RideButton.ALL_MASK
-        val newlyPressed = nowPressed and pressed.inv()
-        pressed = nowPressed
-        if (newlyPressed != 0) listener.onButtonsPressed(newlyPressed)
+        listener.onButtonsHeld(hood, nowPressed)
     }
 }
