@@ -27,12 +27,15 @@ class BridgeService : Service(), ZwiftRideClient.Listener {
     }
 
     private lateinit var prefs: Prefs
-    private lateinit var client: ZwiftRideClient
+    private lateinit var clients: Map<Hood, ZwiftRideClient>
+    private val statuses = linkedMapOf<Hood, String>()
+    private val firmwares = mutableMapOf<Hood, String>()
+    private val pressed = PressedUnion()
 
     override fun onCreate() {
         super.onCreate()
         prefs = Prefs(this)
-        client = ZwiftRideClient(this, this) { prefs.controller }
+        clients = Hood.entries.associateWith { hood -> ZwiftRideClient(this, hood, this) { prefs.controller(hood) } }
         getSystemService(NotificationManager::class.java).createNotificationChannel(
             NotificationChannel(CHANNEL, "Controller bridge", NotificationManager.IMPORTANCE_LOW)
         )
@@ -43,13 +46,13 @@ class BridgeService : Service(), ZwiftRideClient.Listener {
         if (!isRunning) {
             isRunning = true
             Hub.update(running = true)
-            client.start()
+            clients.values.forEach { it.start() }
         }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        client.stop()
+        clients.values.forEach { it.stop() }
         isRunning = false
         Hub.learning = null
         Hub.update(status = "Stopped", running = false, connected = false)
@@ -60,22 +63,35 @@ class BridgeService : Service(), ZwiftRideClient.Listener {
 
     // ---- Controller events ----------------------------------------------------------------
 
-    override fun onStatus(text: String) {
-        Hub.update(status = text)
-        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification(text))
+    override fun onStatus(hood: Hood, text: String) {
+        statuses[hood] = text
+        val combined = statuses.entries.joinToString("\n") { (h, t) -> "${h.label.replaceFirstChar(Char::uppercase)}: $t" }
+        Hub.update(status = combined)
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIFICATION_ID, notification(combined.replace("\n", " · ")))
     }
 
-    override fun onConnected(firmware: String?, address: String) {
-        Hub.update(connected = true, firmware = firmware ?: "unknown")
-        ControllerPin.toPin(prefs.controller, address)?.let {
-            prefs.controller = it
-            Hub.update(lastEvent = "Controller $it remembered")
+    override fun onConnected(hood: Hood, firmware: String?, address: String) {
+        firmwares[hood] = firmware ?: "unknown"
+        Hub.update(connected = true, firmware = firmwares.values.distinct().joinToString(" / "))
+        ControllerPin.toPin(prefs.controller(hood), address)?.let {
+            prefs.setController(hood, it)
+            Hub.update(lastEvent = "Controller $it remembered (${hood.label})")
         }
     }
 
-    override fun onDisconnected() = Hub.update(connected = false)
+    override fun onDisconnected(hood: Hood) {
+        pressed.clear(hood)
+        firmwares.remove(hood)
+        Hub.update(connected = firmwares.isNotEmpty())
+    }
 
-    override fun onButtonsPressed(newlyPressed: Int) {
+    override fun onButtonsHeld(hood: Hood, held: Int) {
+        val newlyPressed = pressed.update(hood, held)
+        if (newlyPressed != 0) onButtonsPressed(hood, newlyPressed)
+    }
+
+    private fun onButtonsPressed(hood: Hood, newlyPressed: Int) {
         Hub.learning?.let { dir ->
             val bit = newlyPressed.takeLowestOneBit()
             prefs.setMask(dir, bit)
@@ -84,13 +100,13 @@ class BridgeService : Service(), ZwiftRideClient.Listener {
             return
         }
         when {
-            (newlyPressed and prefs.mask(Direction.UP)) != 0 -> shift(Direction.UP)
-            (newlyPressed and prefs.mask(Direction.DOWN)) != 0 -> shift(Direction.DOWN)
+            (newlyPressed and prefs.mask(Direction.UP)) != 0 -> shift(Direction.UP, hood)
+            (newlyPressed and prefs.mask(Direction.DOWN)) != 0 -> shift(Direction.DOWN, hood)
             else -> Hub.update(lastEvent = "Pressed ${RideButton.labels(newlyPressed)} (not mapped)")
         }
     }
 
-    private fun shift(dir: Direction) {
+    private fun shift(dir: Direction, hood: Hood) {
         val name = "Gear ${dir.name.lowercase()}"
         val point = prefs.point(dir) ?: return Hub.update(lastEvent = "$name: tap point not calibrated yet")
         val tapper = TapService.instance ?: return Hub.update(lastEvent = "$name: accessibility service is off")
@@ -99,7 +115,7 @@ class BridgeService : Service(), ZwiftRideClient.Listener {
         Hub.update(lastEvent = if (ok) name else "$name: tap rejected by Android")
         when (prefs.feedback) {
             Feedback.OFF -> Unit
-            Feedback.CONTROLLER -> client.vibrate()
+            Feedback.CONTROLLER -> clients[hood]?.vibrate()
             Feedback.PHONE -> getSystemService(VibratorManager::class.java).defaultVibrator
                 .vibrate(VibrationEffect.createOneShot(40, VibrationEffect.DEFAULT_AMPLITUDE))
         }

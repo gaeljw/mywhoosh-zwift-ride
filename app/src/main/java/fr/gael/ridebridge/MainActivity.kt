@@ -147,7 +147,7 @@ class MainActivity : Activity() {
     }
 
     private fun forgetController() {
-        prefs.controller = null
+        Hood.entries.forEach { prefs.setController(it, null) }
         render()
         toast(if (BridgeService.isRunning) "Stop and start the bridge to pair with another controller" else "Controller forgotten")
     }
@@ -187,7 +187,9 @@ class MainActivity : Activity() {
         learnUp.text = learnLabel(Direction.UP)
         learnDown.text = learnLabel(Direction.DOWN)
 
-        controllerView.text = prefs.controller?.let { "Only connects to $it" }
+        controllerView.text = Hood.entries
+            .mapNotNull { h -> prefs.controller(h)?.let { "Only connects to the ${h.label} $it" } }
+            .joinToString("\n").ifEmpty { null }
             ?: "Not paired yet: the first Zwift Ride found will be remembered"
 
         pointsView.text = Direction.entries.joinToString("\n") { dir ->

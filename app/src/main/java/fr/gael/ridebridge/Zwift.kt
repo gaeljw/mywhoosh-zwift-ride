@@ -6,12 +6,14 @@ import java.util.UUID
  * Zwift Ride BLE protocol, as reverse-engineered by BikeControl
  * (github.com/jonasbark/swiftcontrol, lib/bluetooth/devices/zwift/).
  *
- * The Ride advertises two halves; only the LEFT hood (manufacturer byte 0x08) is connected to,
- * and it reports the buttons of both hoods.
+ * The Ride advertises two halves, each identified by the first manufacturer-data byte. Both hoods are connected to,
+ * since the right one works without Zwift too. Each reports its own buttons (the left one may report both).
  */
 object Zwift {
     const val MANUFACTURER_ID = 0x094A
+
     const val RIDE_LEFT = 0x08
+    const val RIDE_RIGHT = 0x07
 
     val SERVICE_RIDE: UUID = UUID.fromString("0000fc82-0000-1000-8000-00805f9b34fb")
     val SERVICE_LEGACY: UUID = UUID.fromString("00000001-19ca-4651-86e5-fa29dcdd09d1")
@@ -27,6 +29,27 @@ object Zwift {
     val VIBRATE = byteArrayOf(0x12, 0x12, 0x08, 0x0A, 0x06, 0x08, 0x02, 0x10, 0x00, 0x18, 0x20)
 
     const val OP_CONTROLLER_NOTIFICATION = 0x23
+}
+
+enum class Hood(val id: Int, val label: String) { LEFT(Zwift.RIDE_LEFT, "left hood"), RIGHT(Zwift.RIDE_RIGHT, "right hood") }
+
+/**
+ * Buttons currently held, merged across hoods. A button reported by both hoods (the left one may also report the
+ * right one's) counts as a single press.
+ */
+class PressedUnion {
+    private val byHood = mutableMapOf<Hood, Int>()
+
+    private fun union() = byHood.values.fold(0) { a, b -> a or b }
+
+    /** Records what [hood] reports as held; returns the buttons that no hood was holding before. */
+    fun update(hood: Hood, pressed: Int): Int {
+        val before = union()
+        byHood[hood] = pressed
+        return union() and before.inv()
+    }
+
+    fun clear(hood: Hood) { byHood.remove(hood) }
 }
 
 /** Digital buttons in the RideKeyPadStatus.ButtonMap. Bits are active-low: 0 means pressed. */

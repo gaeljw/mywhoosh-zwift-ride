@@ -27,8 +27,9 @@ RideBridge listens to the Ride's shift buttons over Bluetooth and taps MyWhoosh'
 
 ## How it works
 
-- Connects to the Ride's **left hood** (manufacturer data `0x094A` / first byte `0x08`), which reports the buttons of
-  both hoods.
+- Connects to **both hoods** of the Ride (manufacturer data `0x094A`, first byte `0x08` for the left, `0x07` for the
+  right), each remembered by its own address. Both work without Zwift, so any of the shift buttons can be learned for
+  gear up or down. A button reported by both hoods counts as one press.
 - Handshake and button decoding follow [BikeControl](https://github.com/jonasbark/swiftcontrol). Its current code is
   under a non-commercial licence, so this is an independent Kotlin re-implementation of the protocol for personal use.
 - Taps are sent by an Android **AccessibilityService** (`dispatchGesture`). The calibration overlay is an
@@ -65,9 +66,9 @@ Updates install over the previous version as long as they come from the same rel
    2. If the toggle is greyed out: App info → ⋮ → **Allow restricted settings**.
    3. Xiaomi **autostart**: allow it.
    4. Battery: **no restrictions**, otherwise HyperOS kills the service once MyWhoosh is in front.
-3. Wake the Ride. The status should reach **Ready** and show the firmware version.
+3. Wake the Ride (both hoods). Each hood's status should reach **Ready** and show the firmware version.
 4. Press each shift button once: "Last: Pressed …" shows what the app sees. Use the **Gear up / Gear down** buttons to
-   learn the ones you want (defaults: left shift up / left shift down).
+   learn the ones you want (defaults: left shift up / left shift down; any button of either hood works).
 5. Pick the feedback you want on each shift: off, controller vibration (default) or phone vibration.
 
 ## Calibration
